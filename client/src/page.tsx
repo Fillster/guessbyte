@@ -1,22 +1,37 @@
-"use client"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import GameLobby from "@/components/game-lobby"
+import { createRoomAPI, joinRoomAPI } from "./api/api"
+
 
 export default function HomePage() {
   const [playerName, setPlayerName] = useState("")
   const [gameCode, setGameCode] = useState("")
   const [hasJoined, setHasJoined] = useState(false)
 
-  const handleJoin = () => {
-    if (playerName.trim() && gameCode.trim()) {
-      setHasJoined(true)
-    }
+
+const handleCreate = async () => {
+  try {
+    const pin = await createRoomAPI(playerName);
+    setGameCode(pin);
+    setHasJoined(true);
+  } catch (err) {
+    alert(err.message);
   }
+};
+
+
+  const handleJoin = async () => {
+  try {
+    await joinRoomAPI(gameCode, playerName);
+    setHasJoined(true);
+  } catch (err) {
+    alert(err.message);
+  }
+};
 
   if (hasJoined) {
     return <GameLobby playerName={playerName} gameCode={gameCode} />
@@ -53,6 +68,7 @@ export default function HomePage() {
           <Button onClick={handleJoin} className="w-full" disabled={!playerName.trim() || !gameCode.trim()}>
             Join Game
           </Button>
+           <Button onClick={handleCreate}>Create</Button>
         </CardContent>
       </Card>
     </div>
