@@ -1,22 +1,11 @@
-import socket from "@/utils/socket";
 import { useState, useEffect } from "react";
+import socket from "@/utils/socket";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Clock, Users } from "lucide-react";
 
 interface Player {
-  id: number;
+  id: string;
   name: string;
   isReady: boolean;
-}
-
-interface GameInterfaceProps {
-  playerName: string;
-  players: Player[];
-  gameCode: string;
 }
 
 interface GameCard {
@@ -26,93 +15,156 @@ interface GameCard {
 }
 
 interface Guess {
-  playerId: number;
   playerName: string;
   guess: string;
   similarity: number;
 }
 
-const gameCards: GameCard[] = [
-  { id: 1, word: "Elephant", category: "Animals" },
-  { id: 2, word: "Pizza", category: "Food" },
-  { id: 3, word: "Guitar", category: "Music" },
-  { id: 4, word: "Ocean", category: "Nature" },
-  { id: 5, word: "Rocket", category: "Space" },
-  { id: 6, word: "Castle", category: "Buildings" },
-];
+interface GameInterfaceProps {
+  playerName: string;
+  players: Player[];
+  gameCode: string;
+  currentPlayer: string;
+  cards: GameCard[];
+}
 
 export default function GameInterface({
   playerName,
-  gameCode,
   players,
+  gameCode,
+  currentPlayer: initialCurrentPlayer,
+  cards: initialCards,
 }: GameInterfaceProps) {
-  const [currentCard, setCurrentCard] = useState<GameCard | null>(null);
-  const [currentPlayer, setCurrentPlayer] = useState<string>("");
-  const [gamePhase, setGamePhase] = useState<
-    "waiting" | "guessing" | "results"
-  >("waiting");
+  const [phase, setPhase] = useState<"picking" | "guessing" | "results">(
+    "picking"
+  );
+  const [currentPlayer, setCurrentPlayer] = useState(initialCurrentPlayer);
+  const [cards, setCards] = useState(initialCards);
+  const [selectedCard, setSelectedCard] = useState<GameCard | null>(null);
   const [guesses, setGuesses] = useState<Guess[]>([]);
   const [playerGuess, setPlayerGuess] = useState("");
+  const [timer, setTimer] = useState(15);
 
   useEffect(() => {
-    // Listen for game events
-    socket.on("new-round", ({ card, currentPlayer }) => {
-      setCurrentCard(card);
-      setCurrentPlayer(currentPlayer);
-      setGamePhase("guessing");
-      setGuesses([]);
+    socket.on("startGuessing", ({ timeLimit }) => {
+      setPhase("guessing");
+      setTimer(timeLimit);
     });
 
-    socket.on("round-results", (results) => {
-      setGuesses(results);
-      setGamePhase("results");
+    socket.on("showResult", ({ correctAnswer, scoredGuesses, winner }) => {
+      console.log("SCORED : ", scoredGuesses);
+      setSelectedCard(correctAnswer);
+      setGuesses(
+        scoredGuesses.map(({ playerName, guess, similarity }) => ({
+          playerName,
+          guess,
+          similarity,
+        }))
+      );
+      setWinner(winner); // Optional, if you want to highlight winner
+      setPhase("results");
+    });
+
+    socket.on("nextTurn", ({ currentPlayer: nextPlayer, cards: newCards }) => {
+      // Reset state for the next round
+      setCurrentPlayer(nextPlayer);
+      setCards(newCards);
+      setSelectedCard(null);
+      setGuesses([]);
+      setPlayerGuess("");
+      setPhase("picking");
     });
 
     return () => {
-      socket.off("new-round");
-      socket.off("round-results");
+      socket.off("startGuessing");
+      socket.off("showResult");
+      socket.off("nextTurn");
     };
   }, []);
 
+  useEffect(() => {
+    if (phase === "guessing" && timer > 0) {
+      const interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
+      return () => clearInterval(interval);
+    }
+  }, [phase, timer]);
+
+  const handlePickCard = (card: GameCard) => {
+    setSelectedCard(card);
+    socket.emit("pickCard", { pin: gameCode, card });
+  };
+
   const submitGuess = () => {
     if (playerGuess.trim()) {
-      socket.emit("submit-guess", { gameCode, playerName, guess: playerGuess });
+      socket.emit("submitGuess", {
+        pin: gameCode,
+        playerName,
+        guess: playerGuess,
+      });
       setPlayerGuess("");
     }
   };
 
   return (
-    <div className="p-4">
-      {gamePhase === "guessing" && currentCard && (
+    <div className="p-6">
+      <h2 className="text-xl mb-4">Current Player: {currentPlayer}</h2>
+
+      {phase === "picking" && (
         <>
-          <h2>Category: {currentCard.category}</h2>
-          {currentPlayer === playerName ? (
-            <p>You are the card holder. Wait for others to guess.</p>
+          {playerName === currentPlayer ? (
+            <div>
+              <h3 className="mb-2">Pick a card:</h3>
+              {cards.map((card) => (
+                <Button
+                  key={card.id}
+                  onClick={() => handlePickCard(card)}
+                  className="m-2"
+                >
+                  {card}
+                </Button>
+              ))}
+            </div>
           ) : (
+            <p>Waiting for {currentPlayer} to pick a card...</p>
+          )}
+        </>
+      )}
+
+      {phase === "guessing" && (
+        <div>
+          <h3>Guess the word! Time left: {timer}s</h3>
+          {playerName !== currentPlayer ? (
             <div>
               <input
                 value={playerGuess}
                 onChange={(e) => setPlayerGuess(e.target.value)}
                 placeholder="Your guess"
+                className="border p-2 m-2"
               />
-              <button onClick={submitGuess}>Submit Guess</button>
+              <Button onClick={submitGuess}>Submit</Button>
             </div>
+          ) : (
+            <p>You picked the word. Waiting for others to guess...</p>
           )}
-        </>
+        </div>
       )}
 
-      {gamePhase === "results" && (
+      {phase === "results" && (
         <div>
-          <h2>The word was: {currentCard?.word}</h2>
-          <h3>Results:</h3>
-          {guesses.map((g) => (
-            <div key={g.playerId}>
-              {g.playerName} guessed "{g.guess}" ({g.similarity}%)
+          <h3>The word was: {selectedCard?.word}</h3>
+          <h4>Guesses:</h4>
+          {guesses.map((g, i) => (
+            <div key={i}>
+              {g.playerName} guessed "{g.guess}"
             </div>
           ))}
-          <button onClick={() => socket.emit("next-round", { gameCode })}>
-            Next Round
-          </button>
+          {playerName === currentPlayer && (
+            <Button
+              onClick={() => socket.emit("next-round", { pin: gameCode })}
+            >
+              Next Round
+            </Button>
+          )}
         </div>
       )}
     </div>

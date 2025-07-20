@@ -19,7 +19,10 @@ interface Player {
 
 export default function GameLobby({ playerName, gameCode }: GameLobbyProps) {
   const [players, setPlayers] = useState<Player[]>([]);
-  const [gameStarted, setGameStarted] = useState(false);
+  const [gameStarted, setGameStarted] = useState<
+    false | { currentPlayer: string; cards: any[] }
+  >(false);
+
   const [hostPlayer, setHostPlayer] = useState("");
   useEffect(() => {
     console.log("playerName: ", playerName);
@@ -41,8 +44,11 @@ export default function GameLobby({ playerName, gameCode }: GameLobbyProps) {
       setPlayers(playerList);
     });
 
-    socket.on("gameStart", () => {
-      setGameStarted(true);
+    socket.on("gameStart", (data) => {
+      setGameStarted({
+        currentPlayer: data.currentPlayer,
+        cards: data.cards,
+      });
     });
 
     return () => {
@@ -75,6 +81,8 @@ export default function GameLobby({ playerName, gameCode }: GameLobbyProps) {
         playerName={playerName}
         gameCode={gameCode}
         players={players}
+        currentPlayer={gameStarted.currentPlayer}
+        cards={gameStarted.cards}
       />
     );
   }

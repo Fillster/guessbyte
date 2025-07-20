@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 import cors from "cors";
 import { createRoom, getRoom, joinRoom } from "./gameManager.js";
 import { getRandomCards } from "./cardData.js";
+import axios from "axios"; // Make sure to install axios
 
 const app = express();
 const server = http.createServer(app);
@@ -12,7 +13,6 @@ const io = new Server(server, { cors: { origin: "*" } });
 app.use(cors());
 app.use(express.json());
 
-// HTTP endpoints for creating/joining games
 app.post("/create", (req, res) => {
   const { name } = req.body;
   const room = createRoom(name);
@@ -26,7 +26,6 @@ app.post("/join", (req, res) => {
   res.json({ success: true });
 });
 
-// Socket.io logic
 io.on("connection", (socket) => {
   console.log("New connection:", socket.id);
 
@@ -46,14 +45,12 @@ io.on("connection", (socket) => {
 
   socket.on("getRoomInfo", (pin, callback) => {
     const room = getRoom(pin);
-    if (!room) {
-      return callback({ error: "Room not found" });
-    }
+    if (!room) return callback({ error: "Room not found" });
 
     callback({
       players: room.players,
       currentTurn: room.currentTurn,
-      host: room.host, // Include host info here
+      host: room.host,
     });
   });
 
@@ -63,6 +60,8 @@ io.on("connection", (socket) => {
 
     room.stage = "picking";
     room.cardOptions = getRandomCards();
+    room.guesses = {};
+    room.selectedCard = null;
 
     io.to(pin).emit("gameStart", {
       currentPlayer: room.players[room.currentTurn].name,
@@ -77,43 +76,94 @@ io.on("connection", (socket) => {
     room.selectedCard = card;
     room.stage = "guessing";
     room.guesses = {};
+    room.guessTimer = null;
 
     io.to(pin).emit("startGuessing", {
       selectedBy: room.players[room.currentTurn].name,
-      timeLimit: 15, // seconds
+      timeLimit: 15,
     });
 
-    setTimeout(() => {
-      room.stage = "showingResult";
-      io.to(pin).emit("showResult", {
-        correctAnswer: card,
-        guesses: room.guesses,
-      });
-
-      // Advance turn
-      room.currentTurn = (room.currentTurn + 1) % room.players.length;
-      room.cardOptions = getRandomCards();
-      room.stage = "picking";
-
-      setTimeout(() => {
-        io.to(pin).emit("nextTurn", {
-          currentPlayer: room.players[room.currentTurn].name,
-          cards: room.cardOptions,
-        });
-      }, 5000); // Show results for 5s
-    }, 15000); // 15s guessing phase
+    // Start guessing phase timer
+    room.guessTimer = setTimeout(() => {
+      finishGuessingPhase(room, pin);
+    }, 15000);
   });
 
   socket.on("submitGuess", ({ pin, playerName, guess }) => {
     const room = getRoom(pin);
     if (!room) return;
 
-    room.guesses[playerName] = guess;
+    if (!room.guesses[playerName]) {
+      room.guesses[playerName] = [];
+    }
+
+    room.guesses[playerName].push({
+      text: guess,
+      time: Date.now(),
+    });
+  });
+
+  async function finishGuessingPhase(room, pin) {
+    room.stage = "showingResult";
+
+    // Get the **last guess** from each player to send for scoring
+    const lastGuesses = {};
+    for (const [player, guesses] of Object.entries(room.guesses)) {
+      const last = guesses[guesses.length - 1];
+      lastGuesses[player] = last.text;
+    }
+
+    try {
+      const response = await axios.post("http://localhost:8000/similarity", {
+        target: room.selectedCard,
+        guesses: lastGuesses,
+      });
+      console.log("RESPONSE: ", response);
+      const { winner, results } = response.data;
+
+      io.to(pin).emit("showResult", {
+        correctAnswer: room.selectedCard,
+        guesses: room.guesses, // Send full history
+        similarities: results, // Send similarity scores
+        winner,
+      });
+    } catch (err) {
+      console.error("Similarity API error:", err);
+      io.to(pin).emit("errorMsg", "Scoring failed");
+    }
+
+    // Prepare next round
+    room.currentTurn = (room.currentTurn + 1) % room.players.length;
+    room.cardOptions = getRandomCards();
+    room.stage = "picking";
+
+    setTimeout(() => {
+      io.to(pin).emit("nextTurn", {
+        currentPlayer: room.players[room.currentTurn].name,
+        cards: room.cardOptions,
+      });
+    }, 5000);
+  }
+
+  socket.on("next-round", ({ pin }) => {
+    const room = getRoom(pin);
+    if (!room) return;
+
+    room.currentTurn = (room.currentTurn + 1) % room.players.length;
+    room.cardOptions = getRandomCards();
+    room.selectedCard = null;
+    room.guesses = {};
+    room.stage = "picking";
+
+    io.to(pin).emit("nextTurn", {
+      currentPlayer: room.players[room.currentTurn].name,
+      cards: room.cardOptions,
+    });
   });
 
   socket.on("disconnect", () => {
     console.log("Disconnected:", socket.id);
-    // Optionally handle player leave logic here
+    // TODO: Handle player leave logic here (optional)
   });
 });
 
