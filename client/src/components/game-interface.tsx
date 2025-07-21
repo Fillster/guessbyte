@@ -51,7 +51,7 @@ export default function GameInterface({
       setTimer(timeLimit);
     });
 
-    socket.on("showResult", ({ correctAnswer, scoredGuesses, winner }) => {
+    /* socket.on("showResult", ({ correctAnswer, scoredGuesses, winner }) => {
       console.log("SCORED : ", scoredGuesses);
       setSelectedCard(correctAnswer);
       setGuesses(
@@ -63,7 +63,19 @@ export default function GameInterface({
       );
       setWinner(winner); // Optional, if you want to highlight winner
       setPhase("results");
-    });
+    });*/
+
+    socket.on(
+      "showResult",
+      ({ correctAnswer, allGuesses, rankedGuesses, winner }) => {
+        setSelectedCard(correctAnswer);
+        console.log("allGuesses: ", allGuesses);
+        console.log("rankedGuesses: ", rankedGuesses);
+        console.log("CORRECT ANSWER: ", correctAnswer);
+        console.log("WINNER: ", winner);
+        setPhase("results");
+      }
+    );
 
     socket.on("nextTurn", ({ currentPlayer: nextPlayer, cards: newCards }) => {
       // Reset state for the next round
@@ -113,7 +125,7 @@ export default function GameInterface({
         <>
           {playerName === currentPlayer ? (
             <div>
-              <h3 className="mb-2">Pick a card:</h3>
+              <h3 className="mb-2">Pick a cardd:</h3>
               {cards.map((card) => (
                 <Button
                   key={card.id}

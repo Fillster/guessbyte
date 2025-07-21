@@ -106,38 +106,56 @@ io.on("connection", (socket) => {
   async function finishGuessingPhase(room, pin) {
     room.stage = "showingResult";
 
-    // Get the **last guess** from each player to send for scoring
-    const lastGuesses = {};
+    // Prepare all guesses for scoring
+    const allGuessesForScoring = {};
     for (const [player, guesses] of Object.entries(room.guesses)) {
-      const last = guesses[guesses.length - 1];
-      lastGuesses[player] = last.text;
+      allGuessesForScoring[player] = guesses.map((g) => g.text);
     }
 
     try {
       const response = await axios.post("http://localhost:8000/similarity", {
         target: room.selectedCard,
-        guesses: lastGuesses,
+        guesses: allGuessesForScoring,
       });
-      console.log("RESPONSE: ", response);
+      console.log("response: ", response.data);
       const { winner, results } = response.data;
 
+      // Build all guesses with their similarity
+      const scoredGuesses = Object.entries(room.guesses).flatMap(
+        ([playerName, guesses], index) => {
+          return guesses.map((g, idx) => ({
+            playerName,
+            guess: g.text,
+            similarity: results[playerName][idx].similarity,
+            time: g.time,
+          }));
+        }
+      );
+
+      // Sort all guesses by similarity (descending)
+      const rankedGuesses = [...scoredGuesses].sort(
+        (a, b) => b.similarity - a.similarity
+      );
+
+      // Emit to clients
       io.to(pin).emit("showResult", {
         correctAnswer: room.selectedCard,
-        guesses: room.guesses, // Send full history
-        similarities: results, // Send similarity scores
+        allGuesses: scoredGuesses, // For displaying full history
+        rankedGuesses, // For leaderboard / ranking display
         winner,
       });
     } catch (err) {
       console.error("Similarity API error:", err);
       io.to(pin).emit("errorMsg", "Scoring failed");
+      return;
     }
 
     // Prepare next round
-    room.currentTurn = (room.currentTurn + 1) % room.players.length;
-    room.cardOptions = getRandomCards();
-    room.stage = "picking";
-
     setTimeout(() => {
+      room.currentTurn = (room.currentTurn + 1) % room.players.length;
+      room.cardOptions = getRandomCards();
+      room.stage = "picking";
+
       io.to(pin).emit("nextTurn", {
         currentPlayer: room.players[room.currentTurn].name,
         cards: room.cardOptions,
