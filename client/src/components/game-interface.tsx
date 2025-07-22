@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import socket from "@/utils/socket";
 import { Button } from "@/components/ui/button";
+import { Badge } from "./ui/badge";
+import { Clock, Users } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import PickingPhase from "./picking-phase";
+import GuessingPhase from "./guessing-phase";
+import { Input } from "./ui/input";
+import { Progress } from "./ui/progress";
 
 interface Player {
   id: string;
@@ -118,67 +125,77 @@ export default function GameInterface({
   };
 
   return (
-    <div className="p-6">
-      <h2 className="text-xl mb-4">Current Player: {currentPlayer}</h2>
-
-      {phase === "picking" && (
-        <>
-          {playerName === currentPlayer ? (
-            <div>
-              <h3 className="mb-2">Pick a cardd:</h3>
-              {cards.map((card) => (
-                <Button
-                  key={card.id}
-                  onClick={() => handlePickCard(card)}
-                  className="m-2"
-                >
-                  {card}
-                </Button>
-              ))}
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-4">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Badge variant="outline" className="text-lg px-3 py-1">
+              Round 1
+            </Badge>
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              <span className="text-sm text-gray-600">
+                {players.length} players
+              </span>
             </div>
-          ) : (
-            <p>Waiting for {currentPlayer} to pick a card...</p>
-          )}
-        </>
-      )}
-
-      {phase === "guessing" && (
-        <div>
-          <h3>Guess the word! Time left: {timer}s</h3>
-          {playerName !== currentPlayer ? (
-            <div>
-              <input
-                value={playerGuess}
-                onChange={(e) => setPlayerGuess(e.target.value)}
-                placeholder="Your guess"
-                className="border p-2 m-2"
-              />
-              <Button onClick={submitGuess}>Submit</Button>
+          </div>
+          {phase === "guessing" && (
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              <span className="font-mono font-bold text-lg">{timer}s</span>
             </div>
-          ) : (
-            <p>You picked the word. Waiting for others to guess...</p>
           )}
         </div>
-      )}
 
-      {phase === "results" && (
-        <div>
-          <h3>The word was: {selectedCard?.word}</h3>
-          <h4>Guesses:</h4>
-          {guesses.map((g, i) => (
-            <div key={i}>
-              {g.playerName} guessed "{g.guess}"
-            </div>
-          ))}
-          {playerName === currentPlayer && (
-            <Button
-              onClick={() => socket.emit("next-round", { pin: gameCode })}
-            >
-              Next Round
-            </Button>
-          )}
-        </div>
-      )}
+        {/* Current Player */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">
+              {currentPlayer === playerName
+                ? "Your Turn!"
+                : `${currentPlayer}'s Turn`}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+        {phase === "picking" && (
+          <PickingPhase
+            currentPlayer={currentPlayer}
+            playerName={playerName}
+            cards={cards}
+            handlePickCard={handlePickCard}
+          />
+        )}
+        {phase === "guessing" && (
+          <GuessingPhase
+            currentPlayer={currentPlayer}
+            playerName={playerName}
+            timer={timer}
+            guesses={guesses}
+            playerGuess={playerGuess}
+            setPlayerGuess={setPlayerGuess}
+            submitGuess={submitGuess}
+          />
+        )}
+        {phase === "results" && (
+          <div>
+            <h3>The word was: {selectedCard?.word}</h3>
+            <h4>Guesses:</h4>
+            {guesses.map((g, i) => (
+              <div key={i}>
+                {g.playerName} guessed "{g.guess}"
+              </div>
+            ))}
+            {playerName === currentPlayer && (
+              <Button
+                onClick={() => socket.emit("next-round", { pin: gameCode })}
+              >
+                Next Round
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
