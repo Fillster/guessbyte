@@ -151,7 +151,7 @@ io.on("connection", (socket) => {
     }
 
     // Prepare next round
-    setTimeout(() => {
+    /* setTimeout(() => {
       room.currentTurn = (room.currentTurn + 1) % room.players.length;
       room.cardOptions = getRandomCards();
       room.stage = "picking";
@@ -160,7 +160,7 @@ io.on("connection", (socket) => {
         currentPlayer: room.players[room.currentTurn].name,
         cards: room.cardOptions,
       });
-    }, 5000);
+    }, 5000);*/
   }
 
   socket.on("next-round", ({ pin }) => {

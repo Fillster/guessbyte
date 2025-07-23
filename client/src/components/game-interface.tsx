@@ -6,6 +6,7 @@ import { Clock, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import PickingPhase from "./picking-phase";
 import GuessingPhase from "./guessing-phase";
+import ResultsCard from "./results-phase";
 import { Input } from "./ui/input";
 import { Progress } from "./ui/progress";
 
@@ -49,6 +50,7 @@ export default function GameInterface({
   const [cards, setCards] = useState(initialCards);
   const [selectedCard, setSelectedCard] = useState<GameCard | null>(null);
   const [guesses, setGuesses] = useState<Guess[]>([]);
+  const [rankedGuesses, setRankedGuesses] = useState<Guess[]>([]);
   const [playerGuess, setPlayerGuess] = useState("");
   const [timer, setTimer] = useState(15);
 
@@ -78,6 +80,7 @@ export default function GameInterface({
         setSelectedCard(correctAnswer);
         console.log("allGuesses: ", allGuesses);
         console.log("rankedGuesses: ", rankedGuesses);
+        setRankedGuesses(rankedGuesses);
         console.log("CORRECT ANSWER: ", correctAnswer);
         console.log("WINNER: ", winner);
         setPhase("results");
@@ -178,22 +181,12 @@ export default function GameInterface({
           />
         )}
         {phase === "results" && (
-          <div>
-            <h3>The word was: {selectedCard?.word}</h3>
-            <h4>Guesses:</h4>
-            {guesses.map((g, i) => (
-              <div key={i}>
-                {g.playerName} guessed "{g.guess}"
-              </div>
-            ))}
-            {playerName === currentPlayer && (
-              <Button
-                onClick={() => socket.emit("next-round", { pin: gameCode })}
-              >
-                Next Round
-              </Button>
-            )}
-          </div>
+          <ResultsCard
+            currentCard={selectedCard}
+            rankedGuesses={rankedGuesses}
+            onNextRound={() => socket.emit("next-round", { pin: gameCode })}
+            isCurrentPlayer={playerName === currentPlayer}
+          />
         )}
       </div>
     </div>
