@@ -17,11 +17,13 @@ const ResultsCard = ({
   const [showConfetti, setShowConfetti] = useState(false);
 
   const toggleChange = () => {
-    setShowConfetti(!showConfetti);
+    setShowConfetti(true);
+    const timeout = setTimeout(() => setShowConfetti(false), 100);
+    return () => clearTimeout(timeout);
   };
   useEffect(() => {
     setShowConfetti(true);
-    const timeout = setTimeout(() => setShowConfetti(false), 2000);
+    const timeout = setTimeout(() => setShowConfetti(false), 1000);
     return () => clearTimeout(timeout);
   }, [rankedGuesses, playerName]);
 
@@ -40,7 +42,7 @@ const ResultsCard = ({
           >
             <div className="text-lg text-gray-600 mb-2">The card was:</div>
             <div className="text-4xl font-bold text-purple-600">
-              {currentCard.word}
+              {currentCard}
             </div>
             <div className="text-sm text-gray-500">{currentCard.category}</div>
           </motion.div>

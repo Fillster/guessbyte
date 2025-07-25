@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "@/components/ui/badge";
 import GameInterface from "@/components/game-interface";
-import testa from "./testa";
 
 interface GameLobbyProps {
   playerName: string;
@@ -57,20 +56,6 @@ export default function GameLobby({ playerName, gameCode }: GameLobbyProps) {
     };
   }, [gameCode, playerName]);
 
-  useEffect(() => {
-    console.log("HOOSOTPLAYER: ", hostPlayer);
-  }, [hostPlayer]);
-
-  const testFunc = (gameCode) => {
-    socket.emit("getRoomInfo", gameCode, (response) => {
-      if (response.error) {
-        console.error(response.error);
-      } else {
-        console.log(response);
-      }
-    });
-  };
-
   function startGame() {
     socket.emit("startGame", gameCode);
   }
@@ -112,7 +97,7 @@ export default function GameLobby({ playerName, gameCode }: GameLobbyProps) {
           <p className="text-center text-sm text-gray-500 pt-4">
             Waiting for host to start...
           </p>
-          <Button onClick={() => testFunc(gameCode)}>test</Button>
+
           {playerName === hostPlayer && (
             <Button onClick={startGame}>Start Game</Button>
           )}

@@ -47,6 +47,7 @@ export default function GameInterface({
     "picking"
   );
   const [currentPlayer, setCurrentPlayer] = useState(initialCurrentPlayer);
+  const [currentRound, setCurrentRound] = useState(1);
   const [cards, setCards] = useState(initialCards);
   const [selectedCard, setSelectedCard] = useState<GameCard | null>(null);
   const [guesses, setGuesses] = useState<Guess[]>([]);
@@ -90,6 +91,8 @@ export default function GameInterface({
     socket.on("nextTurn", ({ currentPlayer: nextPlayer, cards: newCards }) => {
       // Reset state for the next round
       setCurrentPlayer(nextPlayer);
+      setCurrentRound((prev) => prev + 1);
+
       setCards(newCards);
       setSelectedCard(null);
       setGuesses([]);
@@ -134,7 +137,7 @@ export default function GameInterface({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Badge variant="outline" className="text-lg px-3 py-1">
-              Round 1
+              Round {currentRound}
             </Badge>
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4" />

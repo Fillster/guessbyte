@@ -113,7 +113,7 @@ io.on("connection", (socket) => {
     }
 
     try {
-      const response = await axios.post("http://localhost:8000/similarity", {
+      const response = await axios.post("http://0.0.0.0:8000/similarity", {
         target: room.selectedCard,
         guesses: allGuessesForScoring,
       });
